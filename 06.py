@@ -2,7 +2,7 @@ import fileinput
 from collections import deque
 
 starts = []
-buf = list(fileinput.input())
+buf = [line.strip() for line in fileinput.input()]
 
 
 def find_start(msg, prefix_length):
@@ -15,8 +15,8 @@ def find_start(msg, prefix_length):
             d.append(x)
             d.popleft()
 
-        if not starts and len(set(d)) == prefix_length:
-            starts.append(len(line)+1)
+        if len(set(d)) == prefix_length:
+            return len(line) + 1
 
 print(find_start(buf, 4))
 print(find_start(buf, 14))
