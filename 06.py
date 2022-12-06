@@ -7,13 +7,12 @@ buf = [line.strip() for line in fileinput.input()]
 
 def find_start(msg, prefix_length):
     for line in msg:
-        d = deque(line[:prefix_length])
+        d = deque(line[:prefix_length], prefix_length)
         for i, x in enumerate(line[prefix_length:], prefix_length):
             if len(set(d)) == prefix_length:
                 return i
 
             d.append(x)
-            d.popleft()
 
         if len(set(d)) == prefix_length:
             return len(line) + 1
