@@ -2,17 +2,21 @@ import fileinput
 from collections import deque
 
 starts = []
-for line in fileinput.input():
-    d = deque(line[:4])
-    for i, x in enumerate(line[4:], 4):
-        if len(set(d)) == 4:
-            starts.append(i)
-            break
+buf = list(fileinput.input())
 
-        d.append(x)
-        d.popleft()
 
-    if not starts and len(set(d)) == 4:
-        starts.append(len(line)+1)
+def find_start(msg, prefix_length):
+    for line in msg:
+        d = deque(line[:prefix_length])
+        for i, x in enumerate(line[prefix_length:], prefix_length):
+            if len(set(d)) == prefix_length:
+                return i
 
-print(starts)
+            d.append(x)
+            d.popleft()
+
+        if not starts and len(set(d)) == prefix_length:
+            starts.append(len(line)+1)
+
+print(find_start(buf, 4))
+print(find_start(buf, 14))
