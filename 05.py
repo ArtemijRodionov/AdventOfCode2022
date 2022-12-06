@@ -24,8 +24,10 @@ for line in fileinput.input():
             if crate_name:
                 stacks[i_stack].append(crate_name)
 
+stacks_9001 = []
 for i, stack in enumerate(stacks):
-    stacks[i] = stack[::-1]
+    stacks[i].reverse()
+    stacks_9001.append(stack[:])
 
 for count, from_, to_ in ops:
     from_stack = stacks[from_ - 1]
@@ -33,5 +35,15 @@ for count, from_, to_ in ops:
     for _ in range(count):
         to_stack.append(from_stack.pop())
 
+for count, from_, to_ in ops:
+    from_stack = stacks_9001[from_ - 1]
+    to_stack = stacks_9001[to_ - 1]
+    buffer = []
+    for _ in range(count):
+        buffer.append(from_stack.pop())
+    while buffer:
+        to_stack.append(buffer.pop())
+
 print(''.join([stack[-1] for stack in stacks if stack]))
+print(''.join([stack[-1] for stack in stacks_9001 if stack]))
 
