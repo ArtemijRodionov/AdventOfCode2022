@@ -4,19 +4,20 @@ from dataclasses import dataclass
 
 
 def norm(v):
-    return int(math.copysign(1.0, v))
+    return 0 if v == 0 else int(math.copysign(1.0, v))
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class Vec2:
     x: int = 0
     y: int = 0
 
-    def one(self):
-        return Vec2(norm(self.x), norm(self.y))
-
     def length(self):
         return math.sqrt(self.x**2 + self.y**2)
+
+    def one(self, to):
+        n = self - to
+        return Vec2(norm(n.x), norm(n.y))
 
     def distance(self, to):
         return (self - to).length()
@@ -24,8 +25,29 @@ class Vec2:
     def __sub__(self, vec2):
         return Vec2(self.x - vec2.x, self.y - vec2.y)
 
+    def __isub__(self, vec2):
+        self.x -= vec2.x
+        self.y -= vec2.y
+        return self
+
     def __add__(self, vec2):
         return Vec2(self.x + vec2.x, self.y + vec2.y)
+
+    def __iadd__(self, vec2):
+        self.x += vec2.x
+        self.y += vec2.y
+        return self
+
+
+@dataclass(frozen=True, slots=True)
+class TailMove:
+    x: int = 0
+    y: int = 0
+
+    @classmethod
+    def from_vec2(cls, vec2):
+        return cls(vec2.x, vec2.y)
+
 
 def print_patch(patch):
     minx = min(patch, key=lambda x: x.x).x - 1
@@ -38,7 +60,7 @@ def print_patch(patch):
     for y in reversed(range(miny, maxy)): 
         row = []
         for x in range(minx, maxx):
-            if Vec2(x, y) in patch:
+            if TailMove(x, y) in patch:
                 row.append('#')
             else:
                 row.append('.')
@@ -52,19 +74,23 @@ for line in fileinput.input():
     direction, steps = line.strip().split(' ')
     moves.append((int(steps), dirs[direction]))
 
-head = Vec2()
-tail = Vec2()
-patch = set()
-for steps, direction in moves:
-    for _ in range(steps):
-        head += direction
-        if tail.distance(head) < 2:
-            continue
-        if head.x == tail.x or head.y == tail.y:
-            tail += direction
-        else:
-            tail += (head - tail).one()
-        patch.add(tail)
 
-print(len(patch) + 1)
-#print_patch(patch)
+def simulation(rope):
+    tail_patch = set()
+    head, *body = rope
+    for steps, direction in moves:
+        for _ in range(steps):
+            head += direction
+            ahead = head
+            for part in body:
+                if part.distance(ahead) >= 2:
+                    part += ahead.one(part)
+                ahead = part
+            tail_patch.add(TailMove.from_vec2(body[-1]))
+    return tail_patch
+
+part1 = simulation([Vec2(), Vec2()])
+part2 = simulation([Vec2() for _ in range(10)])
+print(len(part1))
+#print_patch(part2)
+print(len(part2))
