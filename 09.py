@@ -49,13 +49,7 @@ class TailMove:
         return cls(vec2.x, vec2.y)
 
 
-def print_patch(patch):
-    minx = min(patch, key=lambda x: x.x).x - 1
-    miny = min(patch, key=lambda x: x.y).y - 1
-    maxx = max(patch, key=lambda x: x.x).x + 1 
-    maxy = max(patch, key=lambda x: x.y).y + 1
-    print(sorted(patch, key=lambda x: (x.y, x.x)))
-
+def print_patch(patch, minx, maxx, miny, maxy):
     cols = []
     for y in reversed(range(miny, maxy)): 
         row = []
@@ -76,7 +70,6 @@ for line in fileinput.input():
 
 
 def simulation(rope):
-    tail_patch = set()
     head, *body = rope
     for steps, direction in moves:
         for _ in range(steps):
@@ -86,11 +79,19 @@ def simulation(rope):
                 if part.distance(ahead) >= 2:
                     part += ahead.one(part)
                 ahead = part
-            tail_patch.add(TailMove.from_vec2(body[-1]))
-    return tail_patch
+            yield rope
 
-part1 = simulation([Vec2(), Vec2()])
-part2 = simulation([Vec2() for _ in range(10)])
+part1 = set(TailMove.from_vec2(tail) for _, tail in simulation([Vec2(), Vec2()]))
+part2 = set(TailMove.from_vec2(tail) for *_, tail in simulation([Vec2() for _ in range(10)]))
+
 print(len(part1))
-#print_patch(part2)
 print(len(part2))
+
+import time
+import os
+if os.environ.get('PARTY'):
+    for rope in simulation([Vec2() for _ in range(30)]):
+        print_patch(list(map(TailMove.from_vec2, rope)), -30, 30, -30, 5)
+        time.sleep(0.2)
+        os.system('clear')
+
