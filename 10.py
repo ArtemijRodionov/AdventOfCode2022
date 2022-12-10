@@ -44,12 +44,25 @@ class Marker:
             self._mark = self._marks.pop() if self._marks else None
 
 
-def execute(ops):
-    cpu = Marker(CPU())
-    for op in ops:
-        cpu(op)
-    return cpu.signals
+class CRT:
+    def __init__(self, cpu):
+        self.cycles = cpu.cycles
+        self.x = cpu.x
+        self.segments = [['.'] * 40 for _ in range(6)]
 
+    def __call__(self, cpu):
+        x = self.x - 1
+        while self.cycles < cpu.cycles:
+            segment = self.segments[self.cycles // 40]
+            segment_i = self.cycles % 40
+            if x <= segment_i <= x + 2:
+                segment[segment_i] = '#'
+            self.cycles += 1
+        self.x = cpu.x
+
+    def print(self):
+        print('\n'.join([''.join(segment) for segment in self.segments]))
+        
 ops = [] 
 for line in fileinput.input():
     line = line.strip()
@@ -61,6 +74,15 @@ for line in fileinput.input():
     else:
         raise Exception()
 
-signals = execute(ops)
+cpu = CPU()
+marker = Marker(cpu)
+crt = CRT(cpu)
+for op in ops:
+    marker(op)
+    crt(cpu)
+
+signals = marker.signals
 print(signals)
 print(sum(signals))
+crt.print()
+
