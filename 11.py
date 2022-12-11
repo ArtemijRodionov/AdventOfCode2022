@@ -48,6 +48,16 @@ class Operation:
         return self.op(self.lh(old), self.rh(old))
 
 
+class WorryReducedOperation:
+
+    def __init__(self, op, reduce):
+        self.op = op
+        self.reduce = reduce
+
+    def __call__(self, old):
+        return self.reduce(self.op(old))
+
+
 class CountedOperation:
 
     def __init__(self, op):
@@ -85,10 +95,8 @@ class Monkey:
 
     def play(self):
         while self.items:
-            item = self.items.popleft()
-            new_item = self.op(item) // 3
-            throw_to = self.income(new_item)
-            yield throw_to, new_item
+            new_item = self.op(self.items.popleft())
+            yield self.income(new_item), new_item
 
     def __repr__(self):
         return f'<Monkey {self.number}: {list(self.items)}>'
@@ -110,7 +118,11 @@ def parse_monkey(xs):
     monkey = Monkey(
         int(monkey_number.strip(':')),
         Operation.from_str(operation),
-        Income(int(divisible_test), int(true_income), int(false_income)),
+        Income(
+            int(divisible_test),
+            int(true_income),
+            int(false_income),
+        ),
     )
 
     for item in starting_items.split(', '):
@@ -121,18 +133,31 @@ def parse_monkey(xs):
     yield from parse_monkey(xs)
 
 
-def get_monkey_business(monkeys):
-    *_, snd, fst = sorted([monkey.op.counter for monkey in monkeys])
-    return snd * fst
+def print_monkey_business(monkeys):
+    *_, snd, fst = counters = sorted([monkey.op.counter for monkey in monkeys])
+    print(counters)
+    print(snd * fst)
+
+
+def common_div(xs):
+    xs = list(set(xs))
+    m = xs[0]
+    for x in xs[1:]:
+        m *= x
+    return m
 
 
 monkeys = list(parse_monkey(fileinput.input()))
+worrie_reducer = common_div([m.income.test_value for m in monkeys])
 game = Game()
 for monkey in monkeys:
-    monkey.op = CountedOperation(monkey.op)
+    monkey.op = CountedOperation(WorryReducedOperation(monkey.op, lambda x: x % worrie_reducer))
     game.join(monkey)
-
 for _ in range(20):
     game()
-print(get_monkey_business(monkeys))
+print_monkey_business(monkeys)
+
+for _ in range(10000 - 20):
+    game()
+print_monkey_business(monkeys)
 
