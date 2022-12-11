@@ -139,16 +139,24 @@ def print_monkey_business(monkeys):
     print(snd * fst)
 
 
-def common_div(xs):
-    xs = list(set(xs))
-    m = xs[0]
-    for x in xs[1:]:
-        m *= x
-    return m
+def GCD(a, b):
+    while b:
+        a, b = b, a % b
+    return a
 
+
+def LCM(a, b):
+    return abs(a * b) / GCD(a, b)
+
+
+def LCM_set(xs):
+    lcm = LCM(xs[0], xs[1])
+    for x in xs[2:]:
+        lcm = LCM(lcm, x)
+    return lcm
 
 monkeys = list(parse_monkey(fileinput.input()))
-worrie_reducer = common_div([m.income.test_value for m in monkeys])
+worrie_reducer = LCM_set([m.income.test_value for m in monkeys])
 game = Game()
 for monkey in monkeys:
     monkey.op = CountedOperation(WorryReducedOperation(monkey.op, lambda x: x % worrie_reducer))
