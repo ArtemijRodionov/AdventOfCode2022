@@ -56,29 +56,36 @@ impl Heightmap {
 }
 
 static sides: [XY; 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
-// struct BFS {
-//     frontier: LinkedList<XY>,
-//     visited: HashMap<XY, XY>,
-//     heightmap: Heightmap
-// }
+struct BFS<'a> {
+    frontier: LinkedList<XY>,
+    visited: HashMap<XY, XY>,
+    heightmap: &'a Heightmap
+}
 
-// impl BFS {
-//     fn new(heightmap: Heightmap) -> Self {
-//         BFS {
-//             frontier: LinkedList::new(),
-//             visited: HashMap::new(),
-//             heightmap: heightmap,
-//         }
-//     }
-// }
+impl<'a> BFS<'a> {
+    fn new(initial: XY, heightmap: &'a Heightmap) -> Self {
+        let mut bfs = Self {
+            frontier: LinkedList::new(),
+            visited: HashMap::new(),
+            heightmap,
+        };
+        bfs.add(initial, initial);
+        bfs
+    }
 
-// impl Iterator for BFS {
-//     type Item = XY;
+    fn add(&mut self, from: XY, to: XY) {
+        self.visited.insert(to, from);
+        self.frontier.push_back(to);
+    }
+}
 
-//     fn next(&mut self) -> Option<Self::Item> {
-//         return None
-//     }
-// }
+impl<'a> Iterator for BFS<'a> {
+    type Item = XY;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        return None
+    }
+}
 
 
 
@@ -91,6 +98,8 @@ fn main() {
     let heightmap = Heightmap::new(content);
     let start_xy = heightmap.find_height(&'S').unwrap();
     let end_xy = heightmap.find_height(&'E').unwrap();
+
+    let mut bfs = BFS::new(start_xy, &heightmap);
 
     let mut frontier = LinkedList::new();
     let mut path_to_exit = HashMap::new();
