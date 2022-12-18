@@ -1,4 +1,4 @@
-use std::{collections::{LinkedList, HashMap}};
+use std::{collections::{LinkedList, HashMap}, slice::Iter};
 
 type XY = (i64, i64);
 
@@ -55,19 +55,25 @@ impl Heightmap {
     }
 }
 
-static sides: [XY; 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+static SIDES: [XY; 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+
+
 struct BFS<'a> {
+    heightmap: &'a Heightmap,
     frontier: LinkedList<XY>,
     visited: HashMap<XY, XY>,
-    heightmap: &'a Heightmap
+    side_iter: Iter<'a, XY>,
+    current_frontier: Option<XY>,
 }
 
 impl<'a> BFS<'a> {
     fn new(initial: XY, heightmap: &'a Heightmap) -> Self {
         let mut bfs = Self {
+            heightmap,
             frontier: LinkedList::new(),
             visited: HashMap::new(),
-            heightmap,
+            side_iter: SIDES.iter(),
+            current_frontier: None,
         };
         bfs.add(initial, initial);
         bfs
@@ -83,6 +89,26 @@ impl<'a> Iterator for BFS<'a> {
     type Item = XY;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.current_frontier.is_none() {
+            self.current_frontier = self.frontier.pop_front();
+        }
+
+        while let Some(xy) = self.current_frontier {
+            if let Some((x_offset, y_offset)) = self.side_iter.next() {
+                let (x, y) = xy;
+                let xyn = (x + x_offset, y + y_offset);
+                if self.visited.contains_key(&xyn) || !self.heightmap.is_possible_elevation(xy, xyn) {
+                    continue;
+                }
+
+                self.add(xy, xyn);
+                return Some(xyn)
+            } else {
+                self.side_iter = SIDES.iter();
+                self.current_frontier = self.frontier.pop_front();
+            }
+        }
+
         return None
     }
 }
@@ -100,31 +126,15 @@ fn main() {
     let end_xy = heightmap.find_height(&'E').unwrap();
 
     let mut bfs = BFS::new(start_xy, &heightmap);
-
-    let mut frontier = LinkedList::new();
-    let mut path_to_exit = HashMap::new();
-    frontier.push_back(start_xy);
-
-    let mut populate_path_to_exit = || {
-        while let Some(xy) = frontier.pop_front() {
-            let (x, y) = xy;
-            if xy == end_xy {
-                return Some((x, y));
-            }
-            for (x_offset, y_offset) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
-                let (xn, yn) = (x + x_offset, y + y_offset);
-                if path_to_exit.contains_key(&(xn, yn))  { continue; }
-                if heightmap.is_possible_elevation(xy, (xn, yn)) {
-                    path_to_exit.insert((xn, yn), (x, y));
-                    frontier.push_back((xn, yn));
-                }
-            }
+    for xy in &mut bfs {
+        if xy == end_xy {
+            break;
         }
-        return None
-    };
+    }
+
     let mut step_count = 0;
-    let mut xy = populate_path_to_exit().unwrap();
-    while let Some(nxy) = path_to_exit.get(&xy) {
+    let mut xy = end_xy;
+    while let Some(nxy) = bfs.visited.get(&xy) {
         step_count += 1;
         if *nxy == start_xy {
             break;
