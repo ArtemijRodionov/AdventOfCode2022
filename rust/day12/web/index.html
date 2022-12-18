@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<script type="module">
+			import init, { greet } from "./pkg/day12.js";
+			(async function run() {
+				await init();
+				let s = greet("Cool Bear");
+				document.getElementById("output").innerText = s;
+			})();
+		</script>
+	</head>
+	<body>
+		<div id="output"></div>
+	</body>
+</html>
