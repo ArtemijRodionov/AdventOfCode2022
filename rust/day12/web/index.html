@@ -1,16 +1,88 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<script type="module">
-			import init, { greet } from "./pkg/day12.js";
-			(async function run() {
-				await init();
-				let s = greet("Cool Bear");
-				document.getElementById("output").innerText = s;
-			})();
-		</script>
-	</head>
-	<body>
-		<div id="output"></div>
-	</body>
+    <head>
+        <script type="module">
+            import init, { Heightmap, BFS, XY } from "./pkg/day12.js";
+
+            const getContent = () => {
+                return document.getElementById("input").value;
+            }
+
+            const render = (coords, prev) => {
+                if (prev !== undefined) {
+                    document.getElementById("output").removeChild(prev);
+                }
+
+                let table = document.createElement('table');
+                table.style.width = '640px';
+                table.style.border = '1px solid black';
+
+                let splitted = getContent()
+                    .split('\n')
+                    .map((xs) => xs.split(''));
+
+                for (const [y, xs] of splitted.entries()) {
+                    let tr = table.insertRow();
+                    for (const [x, chr] of xs.entries()) {
+                        const td = tr.insertCell();
+                            td.appendChild(document.createTextNode(chr));
+                            td.style.border = '1px solid';
+                            if (coords[x.toString() + y.toString()])
+                                td.style.background += 'red';
+                            else
+                                td.style.border += ' black';
+                    }
+                }
+
+                document.getElementById("output").appendChild(table);
+                return table;
+            }
+
+            (async function run() {
+                await init();
+                document.getElementById("init-button").onclick = () => {
+                    let content = getContent();
+                    let heightmap = new Heightmap(content);
+                    const start_xy = heightmap.find_height('S');
+                    const end_xy = heightmap.find_height('E');
+
+                    let coords = {};
+                    coords[start_xy.x.toString() + start_xy.y.toString()] = true;
+                    let table = render(coords);
+
+                    let bfs = new BFS(start_xy, heightmap);
+                    document.getElementById("step-button").onclick = () => {
+                        let xy = bfs.next();
+                        coords[xy.x.toString() + xy.y.toString()] = true;
+                        table = render(coords, table);
+                    }
+
+                    // let next_xy = null;
+                    // while (next_xy = bfs.next()) {
+                    //     if (next_xy == end_xy)
+                    //         break;
+                    // }
+
+                    // let step_count = 0;
+                    // let xy = end_xy;
+                    // next_xy = null;
+                    // while (next_xy = bfs.backtrack(xy)) {
+                    //     step_count++;
+                    //     if (next_xy.x == start_xy.x && next_xy.y == start_xy.y || step_count > 10000)
+                    //         break;
+                    //     xy = next_xy;
+                    // }
+                    // console.log(step_count);
+                };
+
+                // document.getElementById("output").innerText = s;
+            })();
+        </script>
+    </head>
+    <body>
+        <textarea id="input"></textarea><br>
+        <button id="init-button">Init</button>
+        <button id="step-button">Step</button>
+        <div id="output"></div>
+    </body>
 </html>
