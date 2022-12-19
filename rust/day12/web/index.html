@@ -25,12 +25,15 @@
                     let tr = table.insertRow();
                     for (const [x, chr] of xs.entries()) {
                         const td = tr.insertCell();
-                            td.appendChild(document.createTextNode(chr));
-                            td.style.border = '1px solid';
-                            if (coords[x.toString() + y.toString()])
-                                td.style.background += 'red';
-                            else
-                                td.style.border += ' black';
+                        td.onclick = () => {
+                            console.log(x, y);
+                        }
+                        td.appendChild(document.createTextNode(chr));
+                        td.style.border = '1px solid';
+                        if (coords[`${x}:${y}`])
+                            td.style.background += 'red';
+                        else
+                            td.style.border += ' black';
                     }
                 }
 
@@ -47,13 +50,19 @@
                     const end_xy = heightmap.find_height('E');
 
                     let coords = {};
-                    coords[start_xy.x.toString() + start_xy.y.toString()] = true;
+                    let addCoord = (xy) => {
+                        if (xy === null || xy === undefined) return;
+                        coords[`${xy.x}:${xy.y}`] = true;
+                    }
+
+                    addCoord(start_xy);
                     let table = render(coords);
 
                     let bfs = new BFS(start_xy, heightmap);
                     document.getElementById("step-button").onclick = () => {
-                        let xy = bfs.next();
-                        coords[xy.x.toString() + xy.y.toString()] = true;
+                        let stepCount = parseInt(document.getElementById("step-count").value)
+                        for (let i = 0; i < stepCount; i++)
+                            addCoord(bfs.step());
                         table = render(coords, table);
                     }
 
@@ -81,7 +90,8 @@
     </head>
     <body>
         <textarea id="input"></textarea><br>
-        <button id="init-button">Init</button>
+        <button id="init-button">Init</button><br><br>
+        <input type="number" value="1" id="step-count">
         <button id="step-button">Step</button>
         <div id="output"></div>
     </body>

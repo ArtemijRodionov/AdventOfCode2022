@@ -3,7 +3,7 @@ use std::{collections::{LinkedList, HashMap}, slice::Iter};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub struct XY {
     pub x: i64, pub y: i64
 }
@@ -112,7 +112,7 @@ impl BFS {
     }
 
     #[wasm_bindgen]
-    pub fn next(&mut self) -> Option<XY> {
+    pub fn step(&mut self) -> Option<XY> {
         if self.current_frontier.is_none() {
             self.current_frontier = self.frontier.pop_front();
         }
@@ -134,5 +134,19 @@ impl BFS {
         }
 
         return None
+    }
+}
+
+impl Iterator for BFS {
+    type Item = XY;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.step()
+    }
+}
+
+impl Into<HashMap<XY, XY>> for BFS {
+    fn into(self) -> HashMap<XY, XY> {
+        self.visited
     }
 }
