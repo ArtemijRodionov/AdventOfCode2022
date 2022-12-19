@@ -8,7 +8,7 @@
                 return document.getElementById("input").value;
             }
 
-            const render = (coords, prev) => {
+            const render = (coords, last, prev) => {
                 if (prev !== undefined) {
                     document.getElementById("output").removeChild(prev);
                 }
@@ -30,10 +30,14 @@
                         }
                         td.appendChild(document.createTextNode(chr));
                         td.style.border = '1px solid';
-                        if (coords[`${x}:${y}`])
+                        let coord = `${x}:${y}`;
+                        if (last == coord) {
+                            td.style.background += 'yellow';
+                        } else if (coords[coord]) {
                             td.style.background += 'red';
-                        else
+                        } else {
                             td.style.border += ' black';
+                        }
                     }
                 }
 
@@ -50,20 +54,23 @@
                     const end_xy = heightmap.find_height('E');
 
                     let coords = {};
+                    let last = null;
                     let addCoord = (xy) => {
                         if (xy === null || xy === undefined) return;
-                        coords[`${xy.x}:${xy.y}`] = true;
+                        let coord = `${xy.x}:${xy.y}`;
+                        coords[coord] = true;
+                        last = coord;
                     }
 
                     addCoord(start_xy);
-                    let table = render(coords);
+                    let table = render(coords, last);
 
                     let bfs = new BFS(start_xy, heightmap);
                     document.getElementById("step-button").onclick = () => {
                         let stepCount = parseInt(document.getElementById("step-count").value)
                         for (let i = 0; i < stepCount; i++)
                             addCoord(bfs.step());
-                        table = render(coords, table);
+                        table = render(coords, last, table);
                     }
 
                     // let next_xy = null;
@@ -89,10 +96,13 @@
         </script>
     </head>
     <body>
-        <textarea id="input"></textarea><br>
-        <button id="init-button">Init</button><br><br>
-        <input type="number" value="1" id="step-count">
-        <button id="step-button">Step</button>
-        <div id="output"></div>
+        <div style="position: fixed; top: 0; left: 0; border: 0; margin: 10px; padding: 10px; background-color: beige;">
+            <textarea id="input"></textarea><br>
+            <button id="init-button">Init</button><br><br>
+            <input type="number" value="1" id="step-count">
+            <button id="step-button">Step</button>
+        </div>
+
+        <div id="output" style="margin-top: 150px;"></div>
     </body>
 </html>
