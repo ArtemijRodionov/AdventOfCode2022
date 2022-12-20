@@ -1,64 +1,75 @@
-use std::{collections::{LinkedList, HashMap}, slice::Iter};
+use std::{collections::{HashMap, BinaryHeap}};
 
 use wasm_bindgen::prelude::*;
+use serde::{Serialize, Deserialize};
 
 #[wasm_bindgen]
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy)]
+#[derive(Hash, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct XY {
-    pub x: i64, pub y: i64
+    pub x: i32, pub y: i32
 }
 
 #[wasm_bindgen]
 impl XY {
     #[wasm_bindgen(constructor)]
-    pub fn new(x: i64, y: i64) -> Self {
+    pub fn new(x: i32, y: i32) -> Self {
         XY { x, y }
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct JsArray(pub Vec<XY>);
+
 #[wasm_bindgen]
 pub struct Heightmap {
     map: Vec<Vec<char>>,
-    elevations: HashMap<char, char>,
+    elevations: Vec<char>,
 }
 
 #[wasm_bindgen]
 impl Heightmap {
     #[wasm_bindgen(constructor)]
     pub fn new(map: String) -> Self {
-        let heightmap = map
+        let map = map
             .lines()
             .map(|line| line.chars().collect())
             .collect::<Vec<Vec<char>>>();
 
-        let mut elevations = HashMap::new();
-        elevations.insert('S', 'a');
-        elevations.insert('z', 'E');
-        let all_chars = ('a'..='z').collect::<Vec<char>>();
-        for (i, char) in all_chars.iter().enumerate().skip(1) {
-            elevations.insert(all_chars[i - 1], char.clone());
-        }
+        let mut elevations = Vec::new();
+        elevations.push('S');
+        elevations.extend('a'..='z');
+        elevations.push('E');
 
-        Heightmap { map: heightmap, elevations }
+        Heightmap { map, elevations }
     }
 
-    #[wasm_bindgen]
-    pub fn is_possible_elevation(&self, from: XY, to: XY) -> bool {
+    fn size(&self) -> usize {
+        self.map.len() * self.map[0].len()
+    }
+
+    fn is_possible_move(&self, from: XY, to: XY) -> bool {
         let XY {x, y} = from;
         let XY {x: xn, y: yn} = to;
 
-        if xn < 0 || yn < 0 || yn >= self.map.len() as i64 {
+        if xn < 0 || yn < 0 || yn >= self.map.len() as i32 {
             return false;
         }
 
-        if xn >= self.map[yn as usize].len() as i64 {
+        if xn >= self.map[yn as usize].len() as i32 {
             return false;
         }
 
-        let chr = self.map[y as usize][x as usize];
-        let chrn = self.map[yn as usize][xn as usize];
+        let get_i = |x, y| {
+            let chr = self.map[y as usize][x as usize];
+            self.elevations.iter().position(|&x| x == chr).unwrap()
+        };
 
-        chr == chrn || self.elevations[&chr] == chrn
+        let chr = get_i(x, y);
+        let chrn = get_i(xn, yn);
+
+        return chrn <= chr + 1
     }
 
     #[wasm_bindgen]
@@ -66,7 +77,7 @@ impl Heightmap {
         for (y, line) in self.map.iter().enumerate() {
             for (x, height) in line.iter().enumerate() {
                 if *height == name {
-                    return Some(XY::new(x as i64, y as i64));
+                    return Some(XY::new(x as i32, y as i32));
                 }
             }
         }
@@ -76,64 +87,135 @@ impl Heightmap {
 
 static SIDES: [XY; 4] = [XY{ x : -1, y: 0 }, XY { x: 1, y: 0 }, XY { x: 0, y: -1 }, XY { x: 0, y: 1 }];
 
-
-#[wasm_bindgen]
 pub struct BFS {
+    start: XY,
+    end: XY,
     heightmap: Heightmap,
-    frontier: LinkedList<XY>,
-    visited: HashMap<XY, XY>,
-    side_iter: Iter<'static, XY>,
-    current_frontier: Option<XY>,
+    frontier: BinaryHeap<PriorityXY>,
+    visits: HashMap<XY, XY>,
+    visit_cost: HashMap<XY, i32>
+}
+#[derive(Eq)]
+struct PriorityXY(XY, i32);
+
+impl Ord for PriorityXY {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other.1.cmp(&self.1)
+    }
 }
 
-#[wasm_bindgen]
+impl PartialOrd for PriorityXY {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for PriorityXY {
+    fn eq(&self, other: &Self) -> bool {
+        self.1 == other.1
+    }
+}
+
 impl BFS {
-    #[wasm_bindgen(constructor)]
-    pub fn new(initial: &XY, heightmap: Heightmap) -> Self {
+    pub fn new(start: XY, end: XY, heightmap: Heightmap) -> Self {
         let mut bfs = Self {
+            start,
+            end,
             heightmap,
-            frontier: LinkedList::new(),
-            visited: HashMap::new(),
-            side_iter: SIDES.iter(),
-            current_frontier: None,
+            frontier: BinaryHeap::new(),
+            visits: HashMap::new(),
+            visit_cost: HashMap::new(),
         };
-        bfs.add(*initial, *initial);
+        bfs.add(start, start, 0);
         bfs
     }
 
-    fn add(&mut self, from: XY, to: XY) {
-        self.visited.insert(to, from);
-        self.frontier.push_back(to);
+    fn cost_to_end(&self, xy: XY) -> i32 {
+        (xy.x - self.end.x).abs() + (xy.x - self.end.x).abs()
     }
 
-    #[wasm_bindgen]
-    pub fn backtrack(&self, xy: &XY) -> Option<XY> {
-        self.visited.get(xy).map(|xy| *xy)
+    fn add(&mut self, from: XY, to: XY, cost: i32) {
+        self.visit_cost.insert(to, cost);
+        self.visits.insert(to, from);
+        self.frontier.push(PriorityXY(to, cost + self.cost_to_end(to)));
+    }
+
+    pub fn backtrack(&self, xy: XY) -> Vec<XY> {
+        let mut cur = Some(xy);
+        let mut path = Vec::new();
+        while let Some(xy) = cur {
+            if path.len() > self.heightmap.size() {
+                panic!("Path is too long")
+            }
+
+            if xy == self.start {
+                break
+            }
+
+            path.push(xy);
+            cur = self.visits.get(&xy).map(|xy| *xy);
+        }
+
+        path.reverse();
+        path
+    }
+
+    pub fn step(&mut self) -> Option<XY> {
+        self.frontier
+            .pop()
+            .map(|PriorityXY(xy, _)| {
+                if xy == self.end {
+                    return xy;
+                }
+
+                for XY { x: x_offset, y: y_offset } in SIDES.iter() {
+                    let XY { x, y } = xy;
+                    let xyn = XY::new(x + x_offset, y + y_offset);
+
+                    if !self.heightmap.is_possible_move(xy, xyn) {
+                        continue;
+                    }
+
+                    let new_cost = 1 + self.visit_cost.get(&xy).unwrap();
+                    if self.visit_cost
+                        .get(&xyn)
+                        .map(|&old_cost| new_cost < old_cost)
+                        .unwrap_or(true)
+                    {
+                        self.add(xy, xyn, new_cost);
+                    }
+                }
+
+                return xy;
+        })
+    }
+}
+
+#[wasm_bindgen]
+struct WasmBFS(BFS);
+
+#[wasm_bindgen]
+impl WasmBFS {
+
+    #[wasm_bindgen(constructor)]
+    pub fn new(start: &XY, end: &XY, heightmap: Heightmap) -> Self {
+        WasmBFS(BFS::new(*start, *end, heightmap))
     }
 
     #[wasm_bindgen]
     pub fn step(&mut self) -> Option<XY> {
-        if self.current_frontier.is_none() {
-            self.current_frontier = self.frontier.pop_front();
-        }
+        self.0.step()
+    }
 
-        while let Some(xy) = self.current_frontier {
-            if let Some(XY { x: x_offset, y: y_offset }) = self.side_iter.next() {
-                let XY { x, y } = xy;
-                let xyn = XY::new(x + x_offset, y + y_offset);
-                if self.visited.contains_key(&xyn) || !self.heightmap.is_possible_elevation(xy, xyn) {
-                    continue;
-                }
+    #[wasm_bindgen]
+    pub fn backtrack(&self, xy: &XY) -> JsValue {
+        let xs = JsArray(self.0.backtrack(*xy));
+        JsValue::from_serde(&xs).unwrap()
+    }
 
-                self.add(xy, xyn);
-                return Some(xyn)
-            } else {
-                self.side_iter = SIDES.iter();
-                self.current_frontier = self.frontier.pop_front();
-            }
-        }
-
-        return None
+    #[wasm_bindgen]
+    pub fn search(&mut self) {
+        for _ in &mut self.0 {}
     }
 }
 
@@ -142,11 +224,5 @@ impl Iterator for BFS {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.step()
-    }
-}
-
-impl Into<HashMap<XY, XY>> for BFS {
-    fn into(self) -> HashMap<XY, XY> {
-        self.visited
     }
 }
