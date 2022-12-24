@@ -1,6 +1,7 @@
 use std::{iter::Peekable, str::Chars, cmp::Ordering};
 
 #[derive(Debug)]
+#[derive(Eq)]
 enum Value {
     Interger(i64),
     List(Vec<Value>),
@@ -71,21 +72,35 @@ fn parse(buf: &mut ParseIter) -> Option<Value> {
     }
 }
 
-fn cmp_value(lhs: &Value, rhs: &Value) -> Ordering {
-    match (lhs, rhs) {
-        (Value::Interger(l), Value::Interger(r))       => l.cmp(r),
-        (Value::List(l), Value::List(r)) => {
-            for i in 0..std::cmp::min(r.len(), l.len()) {
-                match cmp_value(&l[i], &r[i]) {
-                    Ordering::Equal => continue,
-                    pred @ Ordering::Less | pred @ Ordering::Greater => return pred,
+impl Ord for Value {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Value::Interger(l), Value::Interger(r))       => l.cmp(r),
+            (Value::List(l), Value::List(r)) => {
+                for i in 0..std::cmp::min(r.len(), l.len()) {
+                    match l[i].cmp(&r[i]) {
+                        Ordering::Equal => continue,
+                        pred @ Ordering::Less | pred @ Ordering::Greater => return pred,
+                    }
                 }
-            }
 
-            return l.len().cmp(&r.len());
-        },
-        (i @ Value::Interger(_), xs) => cmp_value(&i.wrap(), xs),
-        (xs, i @ Value::Interger(_)) => cmp_value(&xs, &i.wrap()),
+                return l.len().cmp(&r.len());
+            },
+            (i @ Value::Interger(_), xs) => i.wrap().cmp(xs),
+            (xs, i @ Value::Interger(_)) => xs.cmp(&i.wrap()),
+        }
+    }
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
     }
 }
 
@@ -97,10 +112,7 @@ fn main() {
         let splitted: Vec<&str> = xs.split('\n').collect();
         let mut lhs = splitted[0].chars().peekable();
         let mut rhs = splitted[1].chars().peekable();
-        if let Ordering::Less = cmp_value(
-            &parse(&mut lhs).unwrap(),
-            &parse(&mut rhs).unwrap(),
-        ) {
+        if parse(&mut lhs).unwrap() < parse(&mut rhs).unwrap() {
             result += i + 1;
         }
     }
