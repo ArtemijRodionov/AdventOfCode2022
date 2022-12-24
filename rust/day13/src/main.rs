@@ -1,7 +1,7 @@
 use std::{iter::Peekable, str::Chars, cmp::Ordering};
 
 #[derive(Debug)]
-#[derive(Eq)]
+#[derive(Eq, Clone)]
 enum Value {
     Interger(i64),
     List(Vec<Value>),
@@ -76,6 +76,8 @@ impl Ord for Value {
     fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
             (Value::Interger(l), Value::Interger(r))       => l.cmp(r),
+            (i @ Value::Interger(_), xs) => i.wrap().cmp(xs),
+            (xs, i @ Value::Interger(_)) => xs.cmp(&i.wrap()),
             (Value::List(l), Value::List(r)) => {
                 for i in 0..std::cmp::min(r.len(), l.len()) {
                     match l[i].cmp(&r[i]) {
@@ -86,8 +88,6 @@ impl Ord for Value {
 
                 return l.len().cmp(&r.len());
             },
-            (i @ Value::Interger(_), xs) => i.wrap().cmp(xs),
-            (xs, i @ Value::Interger(_)) => xs.cmp(&i.wrap()),
         }
     }
 }
@@ -100,7 +100,7 @@ impl PartialOrd for Value {
 
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == Ordering::Equal
+        self == other
     }
 }
 
@@ -116,5 +116,25 @@ fn main() {
             result += i + 1;
         }
     }
-    println!("{}", result);
+    dbg!(result);
+
+    let parsed = content
+        .split('\n')
+        .filter(|x| !x.is_empty())
+        .map(|x| parse(&mut x.chars().peekable()).unwrap());
+
+    let make_divider = |x| {
+        Value::List(vec![Value::List(vec![Value::Interger(x)])])
+    };
+
+    let dividers = vec![make_divider(2), make_divider(6)];
+    let mut packets: Vec<Value> = parsed.chain(dividers.iter().cloned()).collect();
+    packets.sort();
+
+    let decoder_key = dividers
+        .iter()
+        .map(|d| packets.binary_search(d).unwrap() + 1)
+        .product::<usize>();
+
+    dbg!(decoder_key);
 }
