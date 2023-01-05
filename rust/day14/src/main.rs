@@ -1,81 +1,30 @@
-use iced::widget::Scrollable;
-use iced::widget::canvas::{Canvas, Cursor, Frame, Geometry, Path, Program};
-use iced::{Color, Sandbox, Length, Settings, Element, Theme, Rectangle, Size, Point, Vector};
+use eframe::{egui, CreationContext, App, Theme, epaint::{Color32, Vec2, Rect} };
 
-pub fn main() -> iced::Result {
-    Grid::run(Settings::default())
-}
-
-fn rock_color() -> Color {
-    Color::from_rgb8(170, 165, 255)
-    // let peach: Color = Color::from_rgb8(255, 170, 165);
+#[derive(Debug)]
+enum CellType {
+    Sand,
+    Ground,
 }
 
 #[derive(Debug)]
 struct Cell {
     x: i32,
     y: i32,
-    color: Color,
+    t: CellType
+}
+
+impl Cell {
+    const fn color(&self) -> Color32 {
+        match self.t {
+            CellType::Sand => Color32::from_rgb(170, 165, 255),
+            CellType::Ground => Color32::from_rgb(170, 165, 255),
+        }
+    }
 }
 
 struct Grid {
-    cell_size: f32,
-    cell_padding: f32,
     cells: Vec<Cell>
 }
-
-impl Program<Message> for Grid {
-    type State = ();
-
-    fn draw(&self, _state: &(), _theme: &Theme, bounds: Rectangle, _cursor: Cursor) -> Vec<Geometry>{
-        let mut frame = Frame::new(bounds.size());
-
-        for cell in &self.cells {
-            let point = Point {x: cell.x as f32 * self.cell_size, y: cell.y as f32 * self.cell_size };
-            let padded_point = point - Vector { x: self.cell_padding / 2.0, y: self.cell_padding / 2.0 };
-            let rect = Path::rectangle(
-                padded_point,
-                Size { width: self.cell_size - self.cell_padding, height: self.cell_size - self.cell_padding});
-            frame.fill(&rect, cell.color);
-        }
-
-        vec![frame.into_geometry()]
-    }
-}
-
-
-#[derive(Debug)]
-enum Message {}
-
-impl Sandbox for Grid {
-    type Message = Message;
-
-    fn new() -> Self {
-        dbg!(get_rocks());
-        Grid {
-            cell_size: 10.0,
-            cell_padding: 0.1,
-            cells: get_rocks()
-        }
-    }
-
-    fn title(&self) -> String {
-        String::from("Sand sim")
-    }
-
-    fn update(&mut self, _message: Message) {
-
-    }
-
-    fn view(&self) -> Element<Message> {
-        Scrollable::new(
-        Canvas::new(self)
-            .width(Length::Fill)
-            .height(Length::Fill)
-        ).height(Length::Fill).into()
-    }
-}
-
 
 fn get_rocks() -> Vec<Cell> {
     let mut cells = std::collections::HashSet::new();
@@ -87,7 +36,7 @@ fn get_rocks() -> Vec<Cell> {
     for structure in input.split('\n') {
         let mut prev = None;
         for rock in structure.split(" -> ") {
-            let (x, y): (i32, i32)  = {
+            let (x, y) = {
                 let mut xy = rock.split(',');
                 let mut get = || xy.next()
                     .expect("can't get next position")
@@ -95,7 +44,7 @@ fn get_rocks() -> Vec<Cell> {
                     .expect("can't parse position");
                 (get(), get())
             };
-            // dbg!(x, y);
+
             if let Some((px, py)) = prev {
                 use std::cmp::{min, max};
                 let (from_x, to_x) = (min(px, x), max(px, x));
@@ -114,6 +63,76 @@ fn get_rocks() -> Vec<Cell> {
 
     cells
         .into_iter()
-        .map(|(x, y)| Cell { x, y, color: rock_color() })
+        .map(|(x, y)| Cell { x, y, t: CellType::Ground })
         .collect()
+}
+
+
+struct SandSimulation {
+    grid: Grid,
+    scale: Vec2,
+}
+
+impl SandSimulation {
+    fn new(_: &CreationContext) -> Self {
+        Self {
+            grid: Grid{ cells: get_rocks() },
+            scale: Vec2::new(10.0, 10.0),
+        }
+    }
+}
+
+impl App for SandSimulation {
+
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let scale = self.scale;
+            let half = Vec2::new(2.0, 2.0);
+
+            let mut min_x = f32::MAX;
+            let mut max_x = f32::MIN;
+            let mut min_y = f32::MAX;
+            let mut max_y = f32::MIN;
+
+            for cell in &self.grid.cells {
+                min_x = (cell.x as f32).min(min_x);
+                max_x = (cell.x as f32).max(max_x);
+                min_y = (cell.y as f32).min(min_y);
+                max_y = (cell.y as f32).max(max_y);
+            }
+
+            let min_cell = Vec2::new(min_x, min_y) * scale;
+            let max_cell = Vec2::new(max_x, max_y) * scale;
+            let half_grid = (max_cell - min_cell) / half;
+            let half_width = scale / half;
+
+            let center = ui.clip_rect().center().to_vec2();
+            for cell in &self.grid.cells {
+                let point: Vec2 = (cell.x as f32, cell.y as f32).into();
+
+                let aligned = point * scale - min_cell - half_grid + center;
+
+                let rect = Rect {
+                    min: (aligned - half_width).to_pos2(),
+                    max: (aligned + half_width).to_pos2(),
+                };
+
+                ui.painter().rect_filled(rect, 0.0, cell.color());
+            }
+        });
+    }
+}
+
+
+fn main() {
+    let options = eframe::NativeOptions {
+        default_theme: Theme::Light,
+        ..Default::default()
+    };
+
+    eframe::run_native(
+        "Sand simulation",
+        options,
+        Box::new(|cc| Box::new(SandSimulation::new(cc)))
+    );
 }
